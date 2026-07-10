@@ -6,7 +6,6 @@ Combines retrieval from vector store with Groq LLM for accurate, cited answers.
 from typing import List, Dict, Any
 
 from groq import Groq
-from langchain_core.documents import Document
 
 from src.retrieval.vector_store import GigaCorpVectorStore
 from src.utils.config import settings
@@ -22,6 +21,37 @@ class RAGChain:
         self.vector_store = vector_store
         self.client = Groq(api_key=settings.groq_api_key)
         self.model = settings.llm_model
+
+    def _reformulate_question(self, question: str, chat_history: str) -> str:
+        """
+        Reformulate a follow-up question into a standalone query using chat history.
+        If no history, return the question as-is.
+        """
+        if not chat_history or chat_history.strip() == "":
+            return question
+
+        prompt = f"""Given the following conversation history and a follow-up question, rephrase the follow-up question to be a standalone question that can be understood without the conversation context.
+
+Conversation history:
+{chat_history}
+
+Follow-up question: {question}
+
+Standalone question (just the rephrased question, nothing else):"""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that reformulates follow-up questions into standalone queries."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=200
+        )
+
+        standalone = response.choices[0].message.content.strip()
+        # Fallback to original if reformulation fails or returns empty
+        return standalone if standalone else question
 
     def _build_prompt(self, question: str, context: str, chat_history: str = "") -> str:
         """
@@ -93,8 +123,11 @@ Answer (no source citations needed in the text):"""
         """
         Execute the full RAG pipeline: retrieve -> build prompt -> generate -> return with sources.
         """
-        # Step 1: Retrieve relevant documents
-        retrieved_docs = self.vector_store.similarity_search(question, k=settings.retrieval_k)
+        # Step 1: Reformulate follow-up questions using chat history
+        standalone_question = self._reformulate_question(question, chat_history)
+
+        # Step 2: Retrieve relevant documents using the STANDALONE question
+        retrieved_docs = self.vector_store.similarity_search(standalone_question, k=settings.retrieval_k)
 
         if not retrieved_docs:
             return {
@@ -103,13 +136,13 @@ Answer (no source citations needed in the text):"""
                 "retrieved_count": 0
             }
 
-        # Step 2: Format context
+        # Step 3: Format context
         context = self._format_context(retrieved_docs)
 
-        # Step 3: Build prompt
+        # Step 4: Build prompt (use original question for natural feel, but standalone for retrieval)
         prompt = self._build_prompt(question, context, chat_history)
 
-        # Step 4: Generate answer using Groq
+        # Step 5: Generate answer using Groq
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -122,7 +155,7 @@ Answer (no source citations needed in the text):"""
 
         answer = response.choices[0].message.content
 
-        # Step 5: Extract sources
+        # Step 6: Extract sources
         sources = self._extract_sources(retrieved_docs)
 
         return {
