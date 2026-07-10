@@ -1,49 +1,35 @@
-# Core Framework
-langchain>=0.3.0
-langchain-community>=0.3.0
-langchain-core>=0.3.0
-langchain-huggingface>=0.1.0
-langchain-text-splitters>=0.3.0
+# =============================================================================
+# GigaCorp Customer Support RAG Agent — Requirements
+# =============================================================================
+# Python: 3.10 – 3.12 (recommended, tested, stable)
+#         3.14 (works locally with non-critical Pydantic warnings)
+# Architecture: LangChain 0.3+ RAG + Groq LLM + FAISS + Streamlit
+# Deployment: Streamlit Community Cloud (python-3.12 via runtime.txt)
+# Note: Python 3.14 shows a non-critical Pydantic V1 compatibility warning
+# =============================================================================
 
-# Vector Store
-faiss-cpu>=1.8.0
-chromadb>=0.5.0
+# ── LangChain Ecosystem ───────────────────────────────────────────────────────
+langchain>=0.3.0,<0.4.0          # Core orchestration & LCEL chains
+langchain-core>=0.3.0,<0.4.0     # Base abstractions, RunnableWithMessageHistory
+langchain-community>=0.3.0,<0.4.0  # FAISS vector store integration
+langchain-huggingface>=0.1.0     # HuggingFaceEmbeddings (local, privacy-first)
+langchain-text-splitters>=0.3.0  # MarkdownHeaderTextSplitter for semantic chunking
+langchain-groq>=0.1.0            # ChatGroq LLM wrapper (Groq API)
 
-# Embeddings (Local, Free)
-sentence-transformers>=3.0.0
-transformers>=4.40.0
-torch>=2.0.0
+# ── Vector Store & Embeddings ───────────────────────────────────────────────
+faiss-cpu>=1.8.0                 # Facebook AI Similarity Search (CPU, persists to disk)
+sentence-transformers>=3.0.0    # all-MiniLM-L6-v2 embeddings (384-dim, ~90MB download)
 
-# LLM (Groq)
-groq>=0.9.0
+# ── LLM API Client ────────────────────────────────────────────────────────────
+groq>=0.9.0                      # Groq SDK — openai/gpt-oss-120b @ 500 tok/s free tier
 
-# Document Loading
-pypdf>=4.0.0
-python-multipart>=0.0.9
+# ── Web Interface ───────────────────────────────────────────────────────────
+streamlit>=1.38.0                # Session-state chat UI, sidebar, caching
 
-# Web UI
-streamlit>=1.38.0
-streamlit-chat>=0.1.1
+# ── Configuration & Secrets ───────────────────────────────────────────────────
+python-dotenv>=1.0.0             # Load GROQ_API_KEY from .env (never commit secrets)
+pydantic>=2.0.0                  # Type-safe data validation
+pydantic-settings>=2.0.0         # Map env vars to Pydantic models
 
-# Data & Config
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-pyyaml>=6.0.1
-python-dotenv>=1.0.0
-
-# Utilities
-tenacity>=8.2.0
-httpx>=0.27.0
-
-# Testing
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-
-# Dev Tools
-black>=24.0.0
-isort>=5.13.0
-flake8>=7.0.0
-mypy>=1.10.0
-
-# Deployment
-gunicorn>=23.0.0
+# ── HuggingFace Hub (optional but recommended) ───────────────────────────────
+huggingface-hub>=0.20.0          # HF_TOKEN login for higher rate limits on model downloads

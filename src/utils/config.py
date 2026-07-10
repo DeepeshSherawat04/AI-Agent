@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 1024
     
     # Embedding Config (Local HuggingFace)
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_model: str = "sentence-transformers/paraphrase-MiniLM-L3-v2"
     
     # Vector Store Config
     vector_store_path: str = "./data/vector_db"

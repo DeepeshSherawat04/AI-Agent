@@ -1,12 +1,36 @@
-"""
-GigaCorp Customer Support Agent - Streamlit Web Application
-A RAG-powered support chatbot with memory and source citations.
-"""
+# app.py
+import os
+import sys
 
+# ── Streamlit config via env (before streamlit imports) ─────────────────────
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
+
+# ── Python version guard ────────────────────────────────────────────────────
+_PY_VER = sys.version_info
+if _PY_VER < (3, 10):
+    raise RuntimeError(
+        f"Python {_PY_VER.major}.{_PY_VER.minor} is not supported. "
+        "Please use Python 3.10 or higher."
+    )
+if _PY_VER >= (3, 13):
+    import warnings
+    warnings.filterwarnings(
+        "ignore",
+        message="Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater",
+        category=UserWarning,
+    )
+
+# ── Environment & HF auth ───────────────────────────────────────────────────
+from dotenv import load_dotenv
+load_dotenv()
+
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
+
+# ── App imports ─────────────────────────────────────────────────────────────
 import html as html_lib
-
 import streamlit as st
-
 from src.agents.support_agent import get_agent
 
 # ----------------------------------------------------------------------------
