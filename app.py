@@ -1,4 +1,3 @@
-# app.py
 import os
 import sys
 
@@ -199,10 +198,11 @@ def get_agent_instance():
 
 
 def init_session_state():
-    """Initialize Streamlit session state variables."""
+    """Initialize Streamlit session state variables with persistent session_id."""
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # CRITICAL: session_id persists across reruns and refreshes
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
 
@@ -210,8 +210,10 @@ def init_session_state():
         with st.spinner("🎧 Waking up the support agent — first run downloads models (~30s)..."):
             try:
                 st.session_state.agent = get_agent_instance()
-                greeting = st.session_state.agent.chat("Hello")
-                st.session_state.session_id = greeting["session_id"]
+                # Only generate session_id once on first load
+                if st.session_state.session_id is None:
+                    greeting = st.session_state.agent.chat("Hello")
+                    st.session_state.session_id = greeting["session_id"]
             except Exception as exc:
                 st.error(f"Couldn't start the agent: {exc}")
                 st.stop()
@@ -282,6 +284,7 @@ def handle_new_message(prompt: str):
 
     with st.spinner("🎧 Looking into that..."):
         try:
+            # Always use the persisted session_id for memory continuity
             response = st.session_state.agent.chat(
                 message=prompt, session_id=st.session_state.session_id
             )
@@ -292,8 +295,9 @@ def handle_new_message(prompt: str):
                 "session_id": st.session_state.session_id,
             }
 
-    if st.session_state.session_id is None:
-        st.session_state.session_id = response.get("session_id")
+    # Update session_id if agent returned a new one (safety fallback)
+    if response.get("session_id"):
+        st.session_state.session_id = response["session_id"]
 
     st.session_state.messages.append(
         {
@@ -341,9 +345,11 @@ def render_sidebar():
         st.markdown("###  ")
         if st.button("🗑️ Clear chat", type="secondary", use_container_width=True):
             st.session_state.messages = []
+            # Clear agent memory but keep session alive with new greeting
             if st.session_state.get("session_id"):
                 st.session_state.agent.clear_session(st.session_state.session_id)
-                st.session_state.session_id = None
+                greeting = st.session_state.agent.chat("Hello")
+                st.session_state.session_id = greeting["session_id"]
             st.rerun()
 
         if "agent" in st.session_state:
