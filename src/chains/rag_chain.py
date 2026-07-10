@@ -3,9 +3,10 @@ RAG (Retrieval-Augmented Generation) chain for GigaCorp Support Agent.
 Combines retrieval from vector store with Groq LLM for accurate, cited answers.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 from groq import Groq
+from langchain_core.messages import HumanMessage, AIMessage
 
 from src.retrieval.vector_store import GigaCorpVectorStore
 from src.utils.config import settings
@@ -22,12 +23,38 @@ class RAGChain:
         self.client = Groq(api_key=settings.groq_api_key)
         self.model = settings.llm_model
 
+    def _history_to_string(self, chat_history: Union[str, List[Any]]) -> str:
+        """
+        Normalize chat_history to a plain string.
+        Handles both string (legacy) and list of langchain messages (current).
+        """
+        if not chat_history:
+            return ""
+
+        if isinstance(chat_history, str):
+            return chat_history
+
+        # It's a list of HumanMessage / AIMessage objects
+        lines = []
+        for msg in chat_history:
+            if isinstance(msg, HumanMessage):
+                lines.append(f"User: {msg.content}")
+            elif isinstance(msg, AIMessage):
+                lines.append(f"Agent: {msg.content}")
+            else:
+                # Fallback for plain dicts or other formats
+                role = getattr(msg, "type", "unknown")
+                content = getattr(msg, "content", str(msg))
+                prefix = "User" if role == "human" else "Agent" if role == "ai" else "System"
+                lines.append(f"{prefix}: {content}")
+        return "\n".join(lines)
+
     def _reformulate_question(self, question: str, chat_history: str) -> str:
         """
         Reformulate a follow-up question into a standalone query using chat history.
         If no history, return the question as-is.
         """
-        if not chat_history or chat_history.strip() == "":
+        if not chat_history or not isinstance(chat_history, str) or chat_history.strip() == "":
             return question
 
         prompt = f"""Given the following conversation history and a follow-up question, rephrase the follow-up question to be a standalone question that can be understood without the conversation context.
@@ -119,12 +146,15 @@ Answer (no source citations needed in the text):"""
 
         return sources
 
-    def run(self, question: str, chat_history: str = "") -> Dict[str, Any]:
+    def run(self, question: str, chat_history: Union[str, List[Any]] = "") -> Dict[str, Any]:
         """
         Execute the full RAG pipeline: retrieve -> build prompt -> generate -> return with sources.
         """
+        # Normalize chat_history to string (handles list of messages from memory manager)
+        history_str = self._history_to_string(chat_history)
+
         # Step 1: Reformulate follow-up questions using chat history
-        standalone_question = self._reformulate_question(question, chat_history)
+        standalone_question = self._reformulate_question(question, history_str)
 
         # Step 2: Retrieve relevant documents using the STANDALONE question
         retrieved_docs = self.vector_store.similarity_search(standalone_question, k=settings.retrieval_k)
@@ -140,7 +170,7 @@ Answer (no source citations needed in the text):"""
         context = self._format_context(retrieved_docs)
 
         # Step 4: Build prompt (use original question for natural feel, but standalone for retrieval)
-        prompt = self._build_prompt(question, context, chat_history)
+        prompt = self._build_prompt(question, context, history_str)
 
         # Step 5: Generate answer using Groq
         response = self.client.chat.completions.create(
