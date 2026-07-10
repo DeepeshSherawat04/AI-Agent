@@ -1,5 +1,5 @@
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore")
 
 """
 Conversation memory management for GigaCorp Support Agent.

@@ -59,6 +59,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+@st.cache_resource
+def get_agent_instance():
+    """Initialize agent once and cache it across reruns."""
+    return get_agent()
+
+
 def init_session_state():
     """Initialize Streamlit session state variables."""
     if "messages" not in st.session_state:
@@ -68,17 +75,10 @@ def init_session_state():
         st.session_state.session_id = None
     
     if "agent" not in st.session_state:
-        with st.spinner("🚀 Initializing AI Agent... (First load may take 30-60s for downloading embeddings)"):
-            st.session_state.agent = get_agent()
-            # Don't send "Hello" — just create session silently
-            st.session_state.session_id = str(uuid.uuid4())
-            # Add a welcome message from the agent
-            st.session_state.messages.append({
-                "role": "agent",
-                "content": "👋 Hello! I'm your GigaCorp Support Agent. I can help you with questions about shipping, returns, service plans, and more. How can I assist you today?",
-                "sources": [],
-                "retrieved_count": 0
-            })
+        with st.spinner("🚀 Initializing AI Agent... (One-time setup: downloading AI models ~30s)"):
+            st.session_state.agent = get_agent_instance()
+            st.session_state.session_id = st.session_state.agent.chat("Hello")["session_id"]
+
 
 def display_chat_history():
     """Display all messages in the chat history."""

@@ -31,7 +31,7 @@ class RAGChain:
 
 RULES:
 1. Answer based on the provided context. If the answer is not in the context, say "I don't have information about that in our knowledge base. Please contact support@gigacorp.com for assistance."
-2. Always cite your sources at the end of your answer using the format: [Source: <source citation>]
+2. Do NOT add source citations in your answer text. Sources will be displayed separately by the system.
 3. Be concise but thorough. Use bullet points for lists when appropriate.
 4. If the user asks a follow-up question (like "how much does it cost?" after asking about shipping), use the chat history to understand what they're referring to.
 5. Be polite, professional, and helpful.
@@ -51,7 +51,7 @@ Context from GigaCorp Knowledge Base:
 ---
 Customer Question: {question}
 
-Answer (with source citations, or a warm greeting if the user just said hello):"""
+Answer (no source citations needed in the text):"""
 
         return prompt
 

@@ -6,6 +6,7 @@ Handles document loading, chunking, embedding, and FAISS-based retrieval.
 import os
 from pathlib import Path
 from typing import List, Optional
+from functools import lru_cache
 
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
@@ -15,6 +16,18 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.config import settings
 
 
+@lru_cache(maxsize=1)
+def get_embeddings():
+    """
+    Cached HuggingFace embeddings to avoid reloading model on every restart.
+    """
+    return HuggingFaceEmbeddings(
+        model_name=settings.embedding_model,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
+    )
+
+
 class GigaCorpVectorStore:
     """
     Manages the FAISS vector store for GigaCorp FAQ documents.
@@ -22,11 +35,7 @@ class GigaCorpVectorStore:
     """
     
     def __init__(self):
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=settings.embedding_model,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True}
-        )
+        self.embeddings = get_embeddings()
         self.vector_store_path = Path(settings.vector_store_path)
         self.vector_store: Optional[FAISS] = None
         
