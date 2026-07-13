@@ -1,0 +1,4 @@
+# App settings
+app:
+  name: "TrulyIAS Scheduling Assistant"
+  version: "1.0.0"
