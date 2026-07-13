@@ -5,7 +5,7 @@ An AI-powered multi-agent scheduling system built with LangGraph and Streamlit, 
 
 
 ### Live Demo
-Hosted App URL: Streamlit Cloud Deployment
+Hosted App URL: https://ai-agent2.streamlit.app/
 
 
 ### Table of Contents
