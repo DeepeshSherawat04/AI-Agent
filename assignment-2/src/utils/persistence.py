@@ -1,17 +1,25 @@
 """
 SQLite-based persistence for conversation state.
-Uses LangGraph's SqliteSaver for checkpointing.
+Uses LangGraph's SqliteSaver for checkpointing (optional).
 """
 
 import json
 import sqlite3
+from datetime import datetime  # ← ADD THIS (was missing!)
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from langchain_core.messages import message_to_dict, messages_from_dict
-from langgraph.checkpoint.sqlite import SqliteSaver
 
 from src.utils.config import get_config
+
+# Optional LangGraph SqliteSaver import — avoids crash if package missing
+try:
+    from langgraph.checkpoint.sqlite import SqliteSaver
+    _LANGGRAPH_SQLITE_AVAILABLE = True
+except ModuleNotFoundError:
+    SqliteSaver = None  # type: ignore
+    _LANGGRAPH_SQLITE_AVAILABLE = False
 
 
 class SQLiteCheckpointer:
@@ -80,7 +88,7 @@ class SQLiteCheckpointer:
                     state_dict.get("current_agent", "triage"),
                     state_dict.get("last_action", ""),
                     json.dumps(suggested),
-                    sqlite3.datetime.datetime.now().isoformat()
+                    datetime.now().isoformat()
                 )
             )
             conn.commit()
@@ -126,6 +134,12 @@ def get_checkpointer():
     Uses a separate database file to avoid schema conflicts with
     the custom SQLiteCheckpointer table.
     """
+    if not _LANGGRAPH_SQLITE_AVAILABLE:
+        raise RuntimeError(
+            "langgraph-checkpoint-sqlite is not installed. "
+            "Run: pip install langgraph-checkpoint-sqlite"
+        )
+    
     # Use a separate file for LangGraph's internal checkpointing
     db_path = Path("data/langgraph_checkpoints.sqlite")
     db_path.parent.mkdir(parents=True, exist_ok=True)

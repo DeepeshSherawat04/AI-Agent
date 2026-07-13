@@ -7,6 +7,7 @@ Main Streamlit entry point for the Multi-Agent Scheduling Assistant.
 
 import sys
 import uuid
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -23,8 +24,20 @@ from src.utils.config import get_config
 from src.utils.database import get_db
 from src.utils.persistence import SQLiteCheckpointer
 
+# ── Config (must be defined before any function that references it) ─────────
+config = get_config()
 
-# ── Workflow Helper ─────────────────────────────────────────
+# ── Guarded optional imports ────────────────────────────────────────────────
+try:
+    from src.utils.date_parser import resolve_relative_date, normalize_time
+    _DATE_PARSER_AVAILABLE = True
+except Exception:
+    _DATE_PARSER_AVAILABLE = False
+    resolve_relative_date = None
+    normalize_time = None
+
+
+# ── Workflow Helper ─────────────────────────────────────────────────────────
 def _run_workflow(current_state: ConversationState) -> None:
     """Execute the scheduling workflow and update session state."""
     with st.spinner("Thinking..."):
@@ -98,8 +111,7 @@ def _run_workflow(current_state: ConversationState) -> None:
             st.session_state.messages.append(AIMessage(content=error_msg))
 
 
-# ── Page Config ───────────────────────────────────────────────
-config = get_config()
+# ── Page Config ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title=config.app_title,
     page_icon=config.app_icon,
@@ -108,7 +120,7 @@ st.set_page_config(
 )
 
 
-# ── CSS ───────────────────────────────────────────────────────
+# ── CSS ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     .main-header { font-size: 2.2rem; font-weight: 700; color: #1f77b4; margin-bottom: 0.5rem; }
@@ -124,7 +136,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── CRITICAL: State safety helper ─────────────────────────────
+# ── CRITICAL: State safety helper ───────────────────────────────────────────
 def _ensure_state() -> ConversationState:
     """Guarantee st.session_state.state is a ConversationState, never a dict."""
     state = st.session_state.get("state")
@@ -159,12 +171,15 @@ def _ensure_state() -> ConversationState:
         return st.session_state.state
 
     # state is None or something else — create fresh
-    thread_id = st.session_state.get("thread_id", str(uuid.uuid4())[:8])
+    thread_id = st.session_state.get("thread_id")
+    if not thread_id:
+        thread_id = str(uuid.uuid4())[:8]
+        st.session_state.thread_id = thread_id
     st.session_state.state = ConversationState(thread_id=thread_id)
     return st.session_state.state
 
 
-# ── Init Session State ────────────────────────────────────────
+# ── Init Session State ──────────────────────────────────────────────────────
 def init_session_state():
     if "thread_id" not in st.session_state:
         st.session_state.thread_id = str(uuid.uuid4())[:8]
@@ -213,7 +228,7 @@ def init_session_state():
                     current_agent=saved.get("current_agent", "triage"),
                     last_action=saved.get("last_action", ""),
                     booking_details=bd,
-                    suggested_slots=saved.get("suggested_slots", []),  # BUG FIX: Load suggested_slots from SQLite
+                    suggested_slots=saved.get("suggested_slots", []),
                     thread_id=st.session_state.thread_id
                 )
                 loaded = True
@@ -235,7 +250,7 @@ def init_session_state():
 init_session_state()
 
 
-# ── Sidebar ───────────────────────────────────────────────────
+# ── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"<div class='main-header'>{config.app_icon} {config.app_title}</div>", unsafe_allow_html=True)
     st.markdown("<div class='sub-header'>AI-Powered Multi-Agent Scheduling</div>", unsafe_allow_html=True)
@@ -329,15 +344,17 @@ with st.sidebar:
                     st.caption(f"{appt['email']} | {appt['service']}")
         else:
             st.caption("No bookings yet.")
-    except Exception:
-        st.caption("Database not initialized. Run: python scripts/setup_db.py")
+    except Exception as e:
+        st.caption("Database not initialized.")
+        if config.debug:
+            st.caption(f"Debug: {e}")
 
     st.divider()
     st.caption("Built with LangGraph + Streamlit")
     st.caption("© 2026 TrulyIAS Internship")
 
 
-# ── Main Chat Interface ─────────────────────────────────────
+# ── Main Chat Interface ─────────────────────────────────────────────────────
 st.markdown(f"<div class='main-header'>{config.app_icon} {config.app_title}</div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-header'>Multi-Agent Scheduling Assistant with Persistent Memory</div>", unsafe_allow_html=True)
 
@@ -357,11 +374,9 @@ for msg in st.session_state.messages:
                 f"<span class='agent-badge {badge_class}'>{agent.upper()} AGENT</span>",
                 unsafe_allow_html=True
             )
-            
 
 
-# ── Service Selection Dropdown ────────────────────────────────
-# Show interactive service buttons when agent asks for service type
+# ── Service Selection Dropdown ──────────────────────────────────────────────
 safe_state = _ensure_state()
 last_ai_msg = ""
 for msg in reversed(safe_state.messages):
@@ -370,7 +385,7 @@ for msg in reversed(safe_state.messages):
         break
 
 agent_asking_service = (
-    "service" in last_ai_msg and 
+    "service" in last_ai_msg and
     any(phrase in last_ai_msg for phrase in [
         "what type of service", "what service", "which service",
         "service you'd like", "service you want", "service are you looking for",
@@ -387,7 +402,7 @@ if agent_asking_service and not safe_state.booking_details.service and st.sessio
     col1, col2 = st.columns(2)
     service_options = {
         "🤝 Meeting": "Meeting",
-        "🎤 Interview": "Interview", 
+        "🎤 Interview": "Interview",
         "💡 Consultation": "Consultation",
         "🖥️ Demo": "Demo",
         "📊 Review": "Review",
@@ -405,11 +420,8 @@ if agent_asking_service and not safe_state.booking_details.service and st.sessio
                 st.rerun()
 
     st.markdown("---")
-    # NOTE: We do NOT call st.stop() here. The chat input remains visible below
-    # the dropdown buttons, so the user can either click a button or type.
-    # This avoids the scroll-to-top issue caused by st.stop() halting execution.
 
-# ── Chat Input ────────────────────────────────────────────────
+# ── Chat Input ──────────────────────────────────────────────────────────────
 user_input = st.chat_input("Type your message here...")
 
 if user_input and st.session_state.workflow is not None:
@@ -421,36 +433,33 @@ if user_input and st.session_state.workflow is not None:
     st.session_state.messages.append(human_msg)
     current_state.messages.append(human_msg)
 
-    # ═══════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════
     # BUG FIX: Minimal extraction - only update what's explicitly
     # provided, NEVER wipe existing booking details.
-    # ═══════════════════════════════════════════════════════════
-    from src.utils.date_parser import resolve_relative_date, normalize_time
-
+    # ═══════════════════════════════════════════════════════════════════════
     text_lower = user_input.lower()
 
     # Only extract date/time if explicitly present in the message
-    date_extracted = resolve_relative_date(user_input)
-    time_extracted = normalize_time(user_input)
+    if _DATE_PARSER_AVAILABLE:
+        date_extracted = resolve_relative_date(user_input)
+        time_extracted = normalize_time(user_input)
 
-    # BUG FIX: Merge extracted values with existing state, never wipe
-    if date_extracted:
-        current_state.booking_details.date = date_extracted
+        # BUG FIX: Merge extracted values with existing state, never wipe
+        if date_extracted:
+            current_state.booking_details.date = date_extracted
 
-    if time_extracted:
-        current_state.booking_details.time = time_extracted
+        if time_extracted:
+            current_state.booking_details.time = time_extracted
 
     # Extract email only if not already collected
-    import re
     email_match = re.search(r"[\w.-]+@[\w.-]+\.\w+", user_input)
     if email_match and not current_state.booking_details.email:
         current_state.booking_details.email = email_match.group(0)
 
-    # Extract service only if not already collected
-        # Fallback: extract service from text input if not already collected
+    # Fallback: extract service from text input if not already collected
     if not current_state.booking_details.service:
-        services = ["consultation", "review", "meeting", "interview", "demo", 
-                    "general", "coaching", "training", "session", "call", 
+        services = ["consultation", "review", "meeting", "interview", "demo",
+                    "general", "coaching", "training", "session", "call",
                     "class", "webinar", "workshop"]
         for svc in services:
             if svc in text_lower:
@@ -477,7 +486,7 @@ if user_input and st.session_state.workflow is not None:
     st.rerun()
 
 
-# NEW: Tip in a container that doesn't interfere with clicks
+# Tip in a container that doesn't interfere with clicks
 st.divider()
 with st.container():
     st.markdown(
