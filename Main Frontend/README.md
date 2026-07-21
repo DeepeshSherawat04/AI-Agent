@@ -165,21 +165,22 @@ ai-agent-internship/
 │   └── README.md                        # This file
 
 
-### 🚀 Setup Instructions
+#### 🚀 Setup Instructions
 
 1. Clone the Repository
 bash
-git clone https://github.com/YOUR_USERNAME/trulyias-scheduling-assistant.git
-cd trulyias-scheduling-assistant/assignment-2
+git clone https://github.com/DeepeshSherawat04/AI-Agent.git
+cd AI-Agent/assignment-2
 
-2. Create Virtual Environment
+2. Create a Virtual Environment
 bash
 python -m venv venv
 
+Activate it:
 # Windows
 venv\Scripts\activate
 
-# macOS/Linux
+# macOS / Linux
 source venv/bin/activate
 
 3. Install Dependencies
@@ -190,6 +191,7 @@ pip install -r requirements.txt
 bash
 cp .env.example .env
 Edit .env and add your API keys:
+bash
 
 # Required: Groq API Key for LLM inference
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -201,11 +203,12 @@ SENDER_PASSWORD=your-app-password
 
 # Optional: Webhook.site for mock notification visualization
 WEBHOOK_URL=https://webhook.site/your-unique-url
-⚠️ Never commit .env to GitHub. It is already in .gitignore.
+⚠️ Never commit .env to GitHub. It is already listed in .gitignore.
 
-5. Initialize Database
+5. Initialize the Database
 bash
 python scripts/setup_db.py
+
 This creates:
 data/appointments.db — Stores confirmed bookings
 data/checkpoints.db — Stores conversation state for persistence
@@ -213,7 +216,11 @@ data/checkpoints.db — Stores conversation state for persistence
 6. Run the Application
 bash
 streamlit run streamlit_app.py
-The app will open at http://localhost:8501.
+The app will open automatically at http://localhost:8501.
+
+# ☁️ Live Hosted Version
+Prefer to test without cloning? The app is deployed on Streamlit Community Cloud:
+🔗 https://ai-agent2.streamlit.app/
 
 
 

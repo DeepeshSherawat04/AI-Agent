@@ -11,6 +11,7 @@ langchain>=0.3.0,<0.4.0          # Core orchestration & LCEL chains
 langchain-core>=0.3.0,<0.4.0     # Base abstractions, tool binding
 langchain-groq>=0.1.0            # ChatGroq LLM wrapper (Groq API)
 langgraph>=0.2.0                 # Multi-agent state-machine workflow engine
+langgraph-checkpoint-sqlite>=2.0.0  # SqliteSaver for native LangGraph persistence
 
 # ── Web Interface ───────────────────────────────────────────────────────────
 streamlit>=1.38.0                # Session-state chat UI, sidebar, caching
